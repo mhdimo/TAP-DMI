@@ -1,3 +1,29 @@
+# Python
 .venv/
-.idea
-a.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment
+.env
+.env.*
+
+# IDE
+.idea/
+.vscode/
+
+# Logs
+logs/
+*.log
+
+# Data
+data/
+*.db
+
+# Spark
+spark-warehouse/
+metastore_db/
+
+# Docker
+.docker/
