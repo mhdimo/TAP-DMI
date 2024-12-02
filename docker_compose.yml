@@ -66,7 +66,7 @@ services:
 
   irc-client:
     container_name: irc-client
-    build: ./Kafka Connect
+    build: ./kafka-connect
     depends_on:
       - kafka
     env_file: .env
@@ -102,7 +102,7 @@ services:
 
   db-connector:
     container_name: db-connector
-    build: ./db_connector
+    build: ./postgres-elasticsearch
     depends_on:
       - kafka
       - postgres

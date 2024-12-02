@@ -36,6 +36,19 @@ docker-compose exec kafka kafka-topics.sh \
 echo "Waiting for services to be ready..."
 sleep 30
 
+# Initialize Elasticsearch index
+curl -X PUT "localhost:9200/_template/chat_messages" -H 'Content-Type: application/json' -d'{
+  "index_patterns": ["chat_messages*"],
+  "mappings": {
+    "properties": {
+      "timestamp": { "type": "date" },
+      "username": { "type": "keyword" },
+      "message": { "type": "text" },
+      "sentiment_score": { "type": "float" }
+    }
+  }
+}'
+
 # Initialize Kibana dashboards
 echo "Setting up Kibana dashboards..."
 curl -X POST "localhost:5601/api/saved_objects/_import" \
