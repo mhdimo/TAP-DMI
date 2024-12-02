@@ -1,0 +1,2 @@
+spark-nlp==4.4.0
+confluent-kafka==2.3.0
