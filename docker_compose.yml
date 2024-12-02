@@ -1,35 +1,151 @@
 version: '3.8'
 services:
   zookeeper:
+    container_name: zookeeper
     image: confluentinc/cp-zookeeper:latest
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
     ports:
       - "2181:2181"
+    networks:
+      - kafka_network
 
   kafka:
+    container_name: kafka
     image: confluentinc/cp-kafka:latest
     depends_on:
       - zookeeper
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,OUTSIDE://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,OUTSIDE:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,OUTSIDE://0.0.0.0:29092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
     ports:
-      - "9092:9092"
+      - "29092:29092"
+    networks:
+      - kafka_network
+
+  postgres:
+    container_name: postgres
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: osu_chat
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+
+  elasticsearch:
+    container_name: elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.9.3
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - app_network
+
+  kibana:
+    container_name: kibana
+    image: docker.elastic.co/kibana/kibana:7.9.3
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
     networks:
       - app_network
 
   irc-client:
-    image: osu-irc-client
+    container_name: irc-client
+    build: ./Kafka Connect
     depends_on:
       - kafka
-    environment:
-      KAFKA_BROKER: kafka:9092
+    env_file: .env
     networks:
+      - kafka_network
+
+  stream-processor:
+    container_name: stream-processor
+    build: ./stream_processor
+    depends_on:
+      - kafka
+    networks:
+      - kafka_network
+      - app_network
+
+  spark-nlp:
+    container_name: spark-nlp
+    build: 
+      context: ./spark
+      dockerfile: Dockerfile
+    environment:
+      - SPARK_MASTER_URL=local[*]
+      - SPARK_DRIVER_MEMORY=2g
+      - SPARK_EXECUTOR_MEMORY=2g
+    volumes:
+      - ./spark:/app
+      - spark_data:/var/spark
+    depends_on:
+      - kafka
+    networks:
+      - kafka_network
+      - app_network
+
+  db-connector:
+    container_name: db-connector
+    build: ./db_connector
+    depends_on:
+      - kafka
+      - postgres
+      - elasticsearch
+    networks:
+      - kafka_network
       - app_network
 
 networks:
+  kafka_network:
+    driver: bridge
   app_network:
     driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  spark_data:
+    driver: local
+
+x-healthcheck: &kafka-healthcheck
+  healthcheck:
+    test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 30s
+
+x-resource-limits: &default-limits
+  deploy:
+    resources:
+      limits:
+        cpus: '0.50'
+        memory: 512M
+      reservations:
+        cpus: '0.25'
+        memory: 256M
+
+x-logging: &default-logging
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
