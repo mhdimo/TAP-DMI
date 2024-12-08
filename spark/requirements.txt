@@ -1,0 +1,3 @@
+pyspark==3.0.0
+textblob
+py4j==0.10.9
