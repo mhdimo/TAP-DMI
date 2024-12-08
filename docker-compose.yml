@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    build: 
+      context: ./zookeeper
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/opt/zookeeper-3.4.13/data
+
+  kafka:
+    build: 
+      context: ./kafka
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka_data:/kafka/kafka-logs
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_HEAP_OPTS: "-Xmx512M -Xms512M"
+
+  elasticsearch:
+    build: 
+      context: ./elasticsearch
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    environment:
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "discovery.type=single-node"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+
+  kibana:
+    build: 
+      context: ./kibana
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+
+  logstash:
+    build: 
+      context: ./logstash
+    ports:
+      - "5044:5044"
+    depends_on:
+      - kafka
+      - elasticsearch
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+
+  irc-client:
+    build:
+      context: ./irc_client
+    env_file: .env
+    depends_on:
+      - logstash
+
+  spark:
+    build:
+      context: ./spark
+    depends_on:
+      - kafka
+      - elasticsearch
+    environment:
+      - SPARK_LOCAL_IP=spark
+      - SPARK_MASTER_URL=local[*]
+      - SPARK_HOME=/opt/spark
+      - PYTHONPATH=/opt/spark/python:/opt/spark/python/lib/py4j-0.10.9-src.zip
+    volumes:
+      - ./spark:/app
+
+volumes:
+  zookeeper_data:
+  kafka_data:
+  elasticsearch_data:
