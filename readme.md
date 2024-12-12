@@ -1,5 +1,3 @@
-# osu-chat-sentiment-analysis
-
 ![d2a39609f17027150b05de8e01f3561c](https://github.com/user-attachments/assets/f6992e79-ff08-40ab-bfe3-5f25393f16fd)
 
 This project is designed to analyze sentiment in IRC chat messages from the osu! community via the #osu general chat. It uses a combination of Docker, Kafka, Logstash, Elasticsearch, Kibana, and Spark to process and visualize chat data.
